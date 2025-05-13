@@ -35,7 +35,7 @@ class FuelSpider(scrapy.Spider):
 
             yield {
                 'price': price,
-                'type': fuel_type,
+                'fuel_type': fuel_type,
                 'city': city,
                 'county': county,
                 'address': address,
