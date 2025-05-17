@@ -1,10 +1,10 @@
 from dataclasses import dataclass
 from typing import List
-from .FuelData import Fuel
+from .fuel_data import Fuel
 
 @dataclass
 class Station:
-    id: int
+    external_id: str
     name: str
     brand: str
     city: str

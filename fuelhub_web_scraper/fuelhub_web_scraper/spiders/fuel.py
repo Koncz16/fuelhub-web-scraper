@@ -1,7 +1,6 @@
 import scrapy
 import re
 
-
 class FuelSpider(scrapy.Spider):
     name = "fuel"
     allowed_domains = ["www.peco-online.ro"]
@@ -18,7 +17,6 @@ class FuelSpider(scrapy.Spider):
             location = row.xpath('.//span[@class="small d-block text-muted"]/text()').get()
             address_raw = row.xpath('.//span[not(@class)]/text()').get()
 
-            # Parse city and county
             if location and ',' in location:
                 city, county = [part.strip() for part in location.split(',', 1)]
             else:

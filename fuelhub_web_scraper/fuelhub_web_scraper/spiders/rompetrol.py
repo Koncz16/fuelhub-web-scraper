@@ -1,17 +1,20 @@
 import scrapy
 from scrapy.selector import Selector
 import json
-from ..Models.StationData import Station
-from ..Models.FuelData import Fuel
-from ..Enums.FuelQuality import FuelQuality
-from ..Enums.FuelType import FuelType
+from dotenv import load_dotenv
+import os
+from ..Models.station_data import Station
+from ..Models.fuel_data import Fuel
+from ..Enums.fuel_quality import FuelQuality
+from ..Enums.fuel_type import FuelType
+
+load_dotenv()
 
 class RompetrolSpider(scrapy.Spider):
     name = "rompetrol"
     allowed_domains = ["rompetrol.ro"]
-    start_urls = [
-        "https://www.rompetrol.ro/routeplanner/stations?language_id=1"
-    ]
+    start_urls = [os.getenv("ROMPETROL_API_URL")]
+
 
     def parse(self, response):
         data = json.loads(response.text)
@@ -21,7 +24,7 @@ class RompetrolSpider(scrapy.Spider):
             fuels = self.extract_fuels(response, infowindow)
 
             yield Station(
-                id=station.get("id"),
+                external_id=str(station.get("id")),
                 name=station.get("name"),
                 brand=station.get("brand", "Rompetrol"),
                 city=station.get("city"),
@@ -69,6 +72,6 @@ class RompetrolSpider(scrapy.Spider):
         if "Efix S" in fuel_name:
             return FuelQuality.PREMIUM.value
         elif "Efix" in fuel_name:
-            return FuelQuality.EXTRA.value
+            return FuelQuality.NORMAL.value
         else:
             return FuelQuality.NORMAL.value  
