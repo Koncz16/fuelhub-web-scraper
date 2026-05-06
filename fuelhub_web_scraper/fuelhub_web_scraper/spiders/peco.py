@@ -8,6 +8,11 @@ from fuelhub_web_scraper.Models.station import FuelStation
 class PecoSpider(scrapy.Spider):
     name = "peco"
 
+    custom_settings = {
+        "DOWNLOAD_DELAY": 3,
+        "CONCURRENT_REQUESTS_PER_DOMAIN": 1,
+    }
+
     base_url = "https://peco-online.ro/index.php"
 
     fuels = {
@@ -18,9 +23,15 @@ class PecoSpider(scrapy.Spider):
         "diesel_extra": "Motorina_Premium"
     }
 
-# counties = [ # "Cluj", "Alba", "Arad", "Arges", "Bacau", "Bihor", "Bistrita", # "Botosani", "Brasov", "Braila", "Bucuresti", "Buzau", "Caras-Severin", # "Calarasi", "Cluj", "Constanta", "Covasna", "Dambovita", "Dolj", # "Galati", "Giurgiu", "Gorj", "Harghita", "Hunedoara", "Ialomita", # "Iasi", "Ilfov", "Maramures", "Mehedinti", "Mures", "Neamt", # "Olt", "Prahova", "Satu Mare", "Salaj", "Sibiu", "Suceava", # "Teleorman", "Timis", "Tulcea", "Vaslui", "Valcea", "Vrancea" # ]
+    counties = ["Cluj", "Alba", "Arad", "Arges", "Bacau", "Bihor", "Bistrita", 
+    "Botosani", "Brasov", "Braila", "Bucuresti", "Buzau", "Caras-Severin", 
+     "Calarasi", "Cluj", "Constanta", "Covasna", "Dambovita", "Dolj", 
+     "Galati", "Giurgiu", "Gorj", "Harghita", "Hunedoara", "Ialomita", 
+      "Iasi", "Ilfov", "Maramures", "Mehedinti", "Mures", "Neamt", 
+       "Olt", "Prahova", "Satu Mare", "Salaj", "Sibiu", "Suceava", 
+        "Teleorman", "Timis", "Tulcea", "Vaslui", "Valcea", "Vrancea" ]
 
-    counties = ["Mures"]  # start with one county, extend later
+    # counties = ["Mures"]  # start with one county, extend later
 
     retele = [
         "Gazprom", "Lukoil", "Mol", "OMV", "Petrom", "Rompetrol",
