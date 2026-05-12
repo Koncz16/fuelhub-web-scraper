@@ -1,0 +1,11 @@
+venv/
+.git/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+fuelhub_web_scraper/grupped_outputs/
+fuelhub_web_scraper/failed_batches/
+fuelhub_web_scraper/raw_output*.json
+fuelhub_web_scraper/grouped_output*.json
