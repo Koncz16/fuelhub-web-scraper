@@ -5,7 +5,7 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import requests
 
@@ -83,6 +83,32 @@ def write_failed_batch(batch: List[Dict[str, Any]], batch_index: int, reason: st
         json.dump(payload, f, ensure_ascii=False, indent=2)
 
 
+def parse_station_date(station: Dict[str, Any]) -> Optional[datetime.date]:
+    raw_timestamp = station.get("timestamp")
+    if not raw_timestamp or not isinstance(raw_timestamp, str):
+        return None
+
+    try:
+        return datetime.fromisoformat(raw_timestamp).date()
+    except ValueError:
+        return None
+
+
+def resolve_recompute_window(stations: List[Dict[str, Any]]) -> Tuple[str, Dict[str, str]]:
+    parsed_dates = [parsed for parsed in (parse_station_date(station) for station in stations) if parsed is not None]
+
+    if not parsed_dates:
+        fallback_date = datetime.now(timezone.utc).date().isoformat()
+        return "date", {"date": fallback_date}
+
+    min_date = min(parsed_dates)
+    max_date = max(parsed_dates)
+    if min_date == max_date:
+        return "date", {"date": max_date.isoformat()}
+
+    return "range", {"fromDate": min_date.isoformat(), "toDate": max_date.isoformat()}
+
+
 def post_grouped_data(grouped_path: Path) -> None:
     api_base = os.getenv("BACKEND_API_BASE_URL", "").strip()
     if not api_base:
@@ -96,10 +122,14 @@ def post_grouped_data(grouped_path: Path) -> None:
 
     url = f"{api_base.rstrip('/')}/{endpoint.lstrip('/')}"
 
-    token = os.getenv("BACKEND_API_TOKEN", "").strip()
-    headers = {"Content-Type": "application/json"}
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
+    api_key = os.getenv("BACKEND_API_KEY", "").strip()
+    if not api_key:
+        raise ValueError("BACKEND_API_KEY is required for authentication.")
+    
+    headers = {
+        "Content-Type": "application/json",
+        "X-API-Key": api_key
+    }
 
     with grouped_path.open("r", encoding="utf-8") as f:
         stations = json.load(f)
@@ -141,6 +171,50 @@ def post_grouped_data(grouped_path: Path) -> None:
 
     if failed_batches:
         raise RuntimeError(f"Upload completed with {failed_batches} failed batch(es).")
+
+    trigger_statistics_recompute(stations, headers)
+
+
+def trigger_statistics_recompute(stations: List[Dict[str, Any]], headers: Dict[str, str]) -> None:
+    recompute_enabled = os.getenv("STATS_RECOMPUTE_ENABLED", "true").strip().lower()
+    if recompute_enabled in {"false", "0", "no"}:
+        print("Skipping statistics recompute: STATS_RECOMPUTE_ENABLED is disabled.")
+        return
+
+    api_base = os.getenv("BACKEND_API_BASE_URL", "").strip()
+    if not api_base:
+        print("Skipping statistics recompute: BACKEND_API_BASE_URL is not configured.")
+        return
+
+    endpoint = os.getenv("STATS_RECOMPUTE_ENDPOINT", "/api/statistics/recompute").strip()
+    timeout = int(os.getenv("STATS_RECOMPUTE_TIMEOUT_SECONDS", os.getenv("UPLOAD_TIMEOUT_SECONDS", "30")))
+    max_retries = int(os.getenv("STATS_RECOMPUTE_MAX_RETRIES", os.getenv("UPLOAD_MAX_RETRIES", "3")))
+    retry_backoff = float(os.getenv("STATS_RECOMPUTE_RETRY_BACKOFF_SECONDS", os.getenv("UPLOAD_RETRY_BACKOFF_SECONDS", "2")))
+
+    mode, payload = resolve_recompute_window(stations)
+    url = f"{api_base.rstrip('/')}/{endpoint.lstrip('/')}"
+
+    print(f"Triggering statistics recompute ({mode}) via {url}...")
+    last_error = "unknown"
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = requests.post(url, json=payload, headers=headers, timeout=timeout)
+            if 200 <= response.status_code < 300:
+                print(f"Statistics recompute accepted ({mode}).")
+                return
+
+            body_preview = response.text[:500]
+            last_error = f"HTTP {response.status_code}: {body_preview}"
+            print(f"Statistics recompute attempt {attempt} failed: {last_error}")
+        except requests.RequestException as exc:
+            last_error = str(exc)
+            print(f"Statistics recompute attempt {attempt} exception: {last_error}")
+
+        if attempt < max_retries:
+            time.sleep(retry_backoff * attempt)
+
+    raise RuntimeError(f"Statistics recompute failed after {max_retries} attempt(s): {last_error}")
 
 
 def main() -> int:
